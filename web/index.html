@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SOC Sandpile — Live</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header>
+  <h1><span class="soc">SOC</span> Sandpile&nbsp;·&nbsp;<span class="sym" id="symbol">—</span></h1>
+  <span class="feedtag" id="feedtag">feed: —</span>
+  <span><span class="dot" id="conn"></span> <span id="connText" class="muted">connecting…</span></span>
+  <span class="spacer"></span>
+  <div class="chips">
+    <div class="chip"><div class="k">Return</div><div class="v" id="cReturn">—</div></div>
+    <div class="chip"><div class="k">Win rate</div><div class="v" id="cWin">—</div></div>
+    <div class="chip"><div class="k">Brier</div><div class="v" id="cBrier">—</div></div>
+    <div class="chip"><div class="k">Ticks</div><div class="v" id="cN">—</div></div>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" data-tab="market">Market</div>
+  <div class="tab" data-tab="model">Model</div>
+</div>
+<div class="note" id="story"></div>
+
+<main>
+  <!-- MARKET VIEW -->
+  <section class="view active" id="market">
+    <div class="grid">
+      <div class="panel wide">
+        <h2>Price vs Estimated Critical Value
+          <span class="legend"><span><span class="swatch" style="background:var(--price)"></span>price (x)</span>
+          <span><span class="swatch" style="background:var(--xc)"></span>x_c (estimated)</span></span>
+        </h2>
+        <canvas id="chPrice" height="260"></canvas>
+      </div>
+      <div class="panel">
+        <h2>P(avalanche) — next mid-tick down</h2>
+        <canvas id="chProb" height="180"></canvas>
+      </div>
+      <div class="panel">
+        <h2>Virtual Equity</h2>
+        <canvas id="chEquity" height="180"></canvas>
+      </div>
+      <div class="panel wide">
+        <h2>Position</h2>
+        <div style="display:flex; gap:26px; align-items:baseline">
+          <div>state: <span id="posState" class="flat">flat</span></div>
+          <div>exposure: <span id="posExp">$0</span></div>
+          <div>gap (x_c − x): <span id="posGap">—</span></div>
+          <div>last tick: <span id="lastY">—</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MODEL VIEW -->
+  <section class="view" id="model">
+    <div class="grid">
+      <div class="panel wide">
+        <h2>Convergence variables (should stabilise)
+          <span class="legend">
+          <span><span class="swatch" style="background:#58a6ff"></span>α</span>
+          <span><span class="swatch" style="background:#3fb950"></span>β</span>
+          <span><span class="swatch" style="background:#d29922"></span>γ_v</span>
+          <span><span class="swatch" style="background:#f85149"></span>γ_a</span></span>
+        </h2>
+        <canvas id="chParams" height="220"></canvas>
+      </div>
+      <div class="panel">
+        <h2>Calibration (predicted vs realised)</h2>
+        <canvas id="chCalib" height="240"></canvas>
+        <div class="note" style="padding:4px 0 0">On the diagonal = well-calibrated. No ground truth needed — our primary health metric on real data.</div>
+      </div>
+      <div class="panel">
+        <h2>Rolling loss / Brier (EWMA)
+          <span class="legend"><span><span class="swatch" style="background:#f0883e"></span>logloss</span>
+          <span><span class="swatch" style="background:#58a6ff"></span>brier</span></span>
+        </h2>
+        <canvas id="chLoss" height="240"></canvas>
+      </div>
+      <div class="panel wide">
+        <div style="display:flex; gap:30px; flex-wrap:wrap">
+          <div>win rate (cum / roll): <b id="mWin">—</b></div>
+          <div>base down rate: <b id="mBase">—</b></div>
+          <div>logloss: <b id="mLoss">—</b></div>
+          <div>brier: <b id="mBrier">—</b></div>
+          <div>α: <b id="mA">—</b></div>
+          <div>β: <b id="mB">—</b></div>
+          <div>γ_v: <b id="mGv">—</b></div>
+          <div>γ_a: <b id="mGa">—</b></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

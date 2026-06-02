@@ -1,0 +1,17 @@
+# secrets
+.env
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# local data (historical trade dumps can be large)
+data_store/
+*.parquet
+
+# node / frontend
+web/node_modules/
+web/dist/
