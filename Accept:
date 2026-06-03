@@ -1,0 +1,2 @@
+SOC dashboard:  http://localhost:8080
+(model ws on :8765, static on :8080 — Ctrl-C to stop)

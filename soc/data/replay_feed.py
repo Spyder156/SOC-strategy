@@ -17,6 +17,7 @@ from typing import Iterator, Optional
 
 import pandas as pd
 
+from .clean import clean_quotes
 from .feed import Tick
 
 STORE = Path(__file__).resolve().parents[2] / "data_store"
@@ -41,7 +42,7 @@ class ReplayFeed:
                 f"{self.path} not found. Run: python -m soc.data.fetch_history "
                 f"--symbol {self.symbol} --start <date> --end <date>"
             )
-        df = pd.read_parquet(self.path)
+        df = clean_quotes(pd.read_parquet(self.path))   # drop wide/stale IEX quotes -> clean mid
         interval = 1.0 / self.speed if self.speed and self.speed > 0 else 0.0
         n = 0
         for ts, mid in zip(df["ts"].to_numpy(), df["mid"].to_numpy()):

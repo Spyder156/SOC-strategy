@@ -22,14 +22,15 @@ from pathlib import Path
 import pandas as pd
 import requests
 
+_ROOT = Path(__file__).resolve().parents[2]
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    load_dotenv(dotenv_path=_ROOT / ".env")   # explicit path: works even when piped via stdin
 except Exception:
     pass
 
 DATA_URL = os.environ.get("ALPACA_DATA_URL", "https://data.alpaca.markets")
-STORE = Path(__file__).resolve().parents[2] / "data_store"
+STORE = _ROOT / "data_store"
 
 
 def _headers() -> dict:

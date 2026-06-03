@@ -8,96 +8,78 @@
 </head>
 <body>
 <header>
-  <h1><span class="soc">SOC</span> Sandpile&nbsp;·&nbsp;<span class="sym" id="symbol">—</span></h1>
+  <h1><span class="soc">SOC</span> · <span id="symbol">—</span></h1>
   <span class="feedtag" id="feedtag">feed: —</span>
-  <span><span class="dot" id="conn"></span> <span id="connText" class="muted">connecting…</span></span>
+  <span class="conn"><span class="dot" id="conn"></span> <span id="connText">connecting…</span></span>
   <span class="spacer"></span>
   <div class="chips">
     <div class="chip"><div class="k">Return</div><div class="v" id="cReturn">—</div></div>
-    <div class="chip"><div class="k">Win rate</div><div class="v" id="cWin">—</div></div>
+    <div class="chip"><div class="k">Equity</div><div class="v" id="cEquity">—</div></div>
+    <div class="chip"><div class="k">Win</div><div class="v" id="cWin">—</div></div>
     <div class="chip"><div class="k">Brier</div><div class="v" id="cBrier">—</div></div>
+    <div class="chip"><div class="k">LogLoss</div><div class="v" id="cLoss">—</div></div>
     <div class="chip"><div class="k">Ticks</div><div class="v" id="cN">—</div></div>
   </div>
+  <button class="btn" id="pauseBtn">⏸ Pause</button>
 </header>
 
 <div class="tabs">
   <div class="tab active" data-tab="market">Market</div>
   <div class="tab" data-tab="model">Model</div>
 </div>
-<div class="note" id="story"></div>
+<div class="note" id="story">connecting…</div>
 
 <main>
-  <!-- MARKET VIEW -->
+  <!-- MARKET -->
   <section class="view active" id="market">
-    <div class="grid">
-      <div class="panel wide">
-        <h2>Price vs Estimated Critical Value
-          <span class="legend"><span><span class="swatch" style="background:var(--price)"></span>price (x)</span>
-          <span><span class="swatch" style="background:var(--xc)"></span>x_c (estimated)</span></span>
-        </h2>
-        <canvas id="chPrice" height="260"></canvas>
-      </div>
-      <div class="panel">
-        <h2>P(avalanche) — next mid-tick down</h2>
-        <canvas id="chProb" height="180"></canvas>
-      </div>
-      <div class="panel">
-        <h2>Virtual Equity</h2>
-        <canvas id="chEquity" height="180"></canvas>
-      </div>
-      <div class="panel wide">
-        <h2>Position</h2>
-        <div style="display:flex; gap:26px; align-items:baseline">
-          <div>state: <span id="posState" class="flat">flat</span></div>
-          <div>exposure: <span id="posExp">$0</span></div>
-          <div>gap (x_c − x): <span id="posGap">—</span></div>
-          <div>last tick: <span id="lastY">—</span></div>
-        </div>
+    <div class="panel span3" style="grid-row: span 2;">
+      <h2><span><span class="swatch" style="background:var(--price)"></span>price
+        &nbsp;<span class="swatch" style="background:var(--xc)"></span>x_c (estimated)</span>
+        <span class="cur" id="curPrice">—</span></h2>
+      <canvas id="chPrice"></canvas>
+    </div>
+    <div class="panel"><h2><span>P(avalanche)</span><span class="cur" id="curP">—</span></h2><canvas id="chProb"></canvas></div>
+    <div class="panel"><h2><span>Virtual equity</span><span class="cur" id="curEq">—</span></h2><canvas id="chEquity"></canvas></div>
+    <div class="panel"><h2><span>Exposure (signed $)</span><span class="cur" id="curExp">—</span></h2><canvas id="chExposure"></canvas></div>
+    <div class="panel"><h2><span>Gap (x_c − x)</span><span class="cur" id="curGap">—</span></h2><canvas id="chGap"></canvas></div>
+    <div class="panel">
+      <h2>Position</h2>
+      <div class="readout">
+        <span class="lk">state</span><span id="posState" class="flat">flat</span>
+        <span class="lk">last tick</span><span id="lastY">—</span>
+        <span class="lk">return</span><span id="rdReturn">—</span>
+        <span class="lk">total cost</span><span id="rdCost">—</span>
       </div>
     </div>
   </section>
 
-  <!-- MODEL VIEW -->
+  <!-- MODEL -->
   <section class="view" id="model">
-    <div class="grid">
-      <div class="panel wide">
-        <h2>Convergence variables (should stabilise)
-          <span class="legend">
-          <span><span class="swatch" style="background:#58a6ff"></span>α</span>
-          <span><span class="swatch" style="background:#3fb950"></span>β</span>
-          <span><span class="swatch" style="background:#d29922"></span>γ_v</span>
-          <span><span class="swatch" style="background:#f85149"></span>γ_a</span></span>
-        </h2>
-        <canvas id="chParams" height="220"></canvas>
-      </div>
-      <div class="panel">
-        <h2>Calibration (predicted vs realised)</h2>
-        <canvas id="chCalib" height="240"></canvas>
-        <div class="note" style="padding:4px 0 0">On the diagonal = well-calibrated. No ground truth needed — our primary health metric on real data.</div>
-      </div>
-      <div class="panel">
-        <h2>Rolling loss / Brier (EWMA)
-          <span class="legend"><span><span class="swatch" style="background:#f0883e"></span>logloss</span>
-          <span><span class="swatch" style="background:#58a6ff"></span>brier</span></span>
-        </h2>
-        <canvas id="chLoss" height="240"></canvas>
-      </div>
-      <div class="panel wide">
-        <div style="display:flex; gap:30px; flex-wrap:wrap">
-          <div>win rate (cum / roll): <b id="mWin">—</b></div>
-          <div>base down rate: <b id="mBase">—</b></div>
-          <div>logloss: <b id="mLoss">—</b></div>
-          <div>brier: <b id="mBrier">—</b></div>
-          <div>α: <b id="mA">—</b></div>
-          <div>β: <b id="mB">—</b></div>
-          <div>γ_v: <b id="mGv">—</b></div>
-          <div>γ_a: <b id="mGa">—</b></div>
-        </div>
+    <div class="panel span2"><h2>
+      <span><span class="swatch" style="background:var(--accent)"></span>α
+        <span class="swatch" style="background:var(--green)"></span>β
+        <span class="swatch" style="background:var(--yellow)"></span>γ_v
+        <span class="swatch" style="background:var(--red)"></span>γ_a &nbsp;— convergence vars</span>
+      <span class="cur" id="curParams">—</span></h2><canvas id="chParams"></canvas></div>
+    <div class="panel"><h2><span><span class="swatch" style="background:var(--xc)"></span>logloss
+      <span class="swatch" style="background:var(--accent)"></span>brier (EWMA)</span><span class="cur" id="curLoss">—</span></h2><canvas id="chLoss"></canvas></div>
+
+    <div class="panel" style="grid-row: span 2;"><h2><span>Calibration</span><span class="cur" id="curCal">diag = good</span></h2><canvas id="chCalib"></canvas></div>
+    <div class="panel span2"><h2><span><span class="swatch" style="background:var(--purple)"></span>win rate (EWMA)</span><span class="cur" id="curWin">—</span></h2><canvas id="chWin"></canvas></div>
+    <div class="panel span2">
+      <h2>Snapshot</h2>
+      <div class="readout">
+        <span class="lk">win cum / roll</span><span id="mWin">—</span>
+        <span class="lk">base down rate</span><span id="mBase">—</span>
+        <span class="lk">logloss / brier</span><span id="mLB">—</span>
+        <span class="lk">α / β</span><span id="mAB">—</span>
+        <span class="lk">γ_v / γ_a</span><span id="mG">—</span>
       </div>
     </div>
   </section>
 </main>
 
+<div class="tip" id="tip"></div>
 <script src="app.js"></script>
 </body>
 </html>
