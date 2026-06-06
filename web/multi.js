@@ -124,11 +124,13 @@ function update(m) {
     $("ml-" + s).textContent = (st.logloss != null) ? st.logloss.toFixed(4) : "—";
   }
 
-  if (m.corr) for (let i=0;i<SYMS.length;i++) for (let j=0;j<SYMS.length;j++) {
-    const v = m.corr[i][j], el = $(`h-${i}-${j}`); if (!el) continue;
-    el.textContent = v.toFixed(2);
-    el.style.background = v>=0 ? `rgba(88,166,255,${Math.min(1,v).toFixed(2)})` : `rgba(248,81,73,${Math.min(1,-v).toFixed(2)})`;
-    el.style.color = Math.abs(v) > 0.5 ? "#0d1117" : C.muted;
+  const mat = m.couple || m.corr;   // learned coupling matrix W_ij (peer j -> stock i)
+  if (mat) for (let i=0;i<SYMS.length;i++) for (let j=0;j<SYMS.length;j++) {
+    const v = mat[i][j], el = $(`h-${i}-${j}`); if (!el) continue;
+    el.textContent = (i===j) ? "·" : v.toFixed(3);
+    const t = Math.min(1, Math.abs(v) * 12);   // W values are small; scale up for visibility
+    el.style.background = i===j ? "transparent" : (v>=0 ? `rgba(88,166,255,${t.toFixed(2)})` : `rgba(248,81,73,${t.toFixed(2)})`);
+    el.style.color = t > 0.5 ? "#0d1117" : C.muted;
   }
   $("story").textContent = m.training
     ? `Warming up — training & watching x_c / params converge (NOT trading yet)… ${(m.seen||0).toLocaleString()} / ${(m.warmup||0).toLocaleString()} bars`

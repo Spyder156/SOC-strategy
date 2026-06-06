@@ -21,10 +21,14 @@ from ..model.hazard import HazardModel
 from ..metrics.metrics import Metrics
 from ..strategy.allocate import UniverseStrategy
 
-COUPLE_ETA = 0.3             # coupling strength (peer returns -> your x_c, via correlation)
-COUPLE_HALFLIFE = 10.0       # LIGHT smoothing: kills per-bar jitter without the long lag artifact
-CORR_HALFLIFE = 300.0        # bars
+COUPLE_ETA = 1.0             # scales the LEARNING RATE of the coupling matrix (--couple)
+CORR_HALFLIFE = 300.0        # bars (for the displayed return correlation)
 SESSION_GAP_SEC = 300.0      # time jump > this = session boundary (overnight gap) -> reprice
+# learned coupling matrix W_ij (peer j's move -> stock i's x_c), trained on prediction error:
+ETA_W = 0.05                 # base learning rate for W
+W_TAU = 4000.0               # decaying LR so W converges
+W_FLOOR = 0.12               # ...but keeps adapting
+WMAX = 5.0                   # clamp on each W_ij
 
 
 def _a(halflife):
@@ -45,13 +49,14 @@ async def producer_multi(hub, args):
                          "capital": args.capital})
 
     prev = {}                                   # last price per symbol
+    prev_ret = None                             # previous bar's returns (drove last coupling)
     mean = {s: 0.0 for s in syms}               # EWMA mean return
     var = {s: 1e-8 for s in syms}               # EWMA variance
     cov = {(i, j): 0.0 for i in syms for j in syms if i < j}
-    coup = {s: 0.0 for s in syms}               # lightly-smoothed peer-coupling signal
+    W = {i: {j: 0.0 for j in syms if j != i} for i in syms}   # LEARNED coupling matrix
+    nbar = 0
     couple_eta = getattr(args, "couple", COUPLE_ETA)
     ar = _a(CORR_HALFLIFE)
-    a_cp = _a(COUPLE_HALFLIFE)
     frame_dt = 1.0 / args.fps if args.fps and args.fps > 0 else 0.0
     since = 0
     seen = 0
@@ -91,17 +96,34 @@ async def producer_multi(hub, args):
                 var[s] = (1 - ar) * var[s] + ar * (ret[s] - mean[s]) ** 2
             for (i, j) in cov:
                 cov[(i, j)] = (1 - ar) * cov[(i, j)] + ar * (ret[i] - mean[i]) * (ret[j] - mean[j])
-            # coupling: a correlated peer's move nudges THIS stock's x_c. Lightly smoothed so the
-            # nudge is smooth but still fires when the peer actually moves (no long lag).
-            for s in syms:
-                push = sum(rho(s, j) * ret[j] for j in syms if j != s)
-                coup[s] = (1 - a_cp) * coup[s] + a_cp * push
-                st = eng[s].state
-                m = eng[s].model
-                st.x_c *= math.exp(couple_eta * coup[s])
+
+            # --- LEARN the coupling matrix W from prediction error ---
+            # Last bar's coupling (driven by prev_ret) shifted x_c into THIS bar's prediction p_i.
+            # Gradient of stock i's cross-entropy w.r.t. W_ij (through x_c -> log-gap -> p):
+            #   dL/dW_ij = (p_i - y_i) * (-alpha_i / gap_i) * r_j(prev)
+            # so descent gives:  W_ij += lr * (p_i - y_i) * (alpha_i / gap_i) * r_j(prev)
+            nbar += 1
+            lr = ETA_W * couple_eta * max(W_FLOOR, W_TAU / (W_TAU + nbar))
+            if prev_ret is not None:
+                for i in syms:
+                    ev = evs[i]
+                    resid = ev["p"] - ev["y"]
+                    gi = max(math.log(ev["x_c"] / ev["x"]), 1e-4)
+                    grad_i = resid * (ev["params"]["alpha"] / gi)
+                    for j in syms:
+                        if j == i:
+                            continue
+                        W[i][j] = max(-WMAX, min(WMAX, W[i][j] + lr * grad_i * prev_ret[j]))
+            # --- APPLY: x_c_i *= exp( sum_j W_ij * r_j ) ---
+            for i in syms:
+                push = sum(W[i][j] * ret[j] for j in syms if j != i)
+                st = eng[i].state
+                m = eng[i].model
+                st.x_c *= math.exp(push)
                 floor = st.x * math.exp(max(m.eps, m.k_vol * st.vol))   # vol-scaled, no touch
                 if st.x_c < floor:
                     st.x_c = floor
+            prev_ret = dict(ret)
         prev = dict(prices)
         seen += 1
         training = seen <= args.warmup
@@ -134,10 +156,12 @@ async def producer_multi(hub, args):
         if since >= args.stride:
             since = 0
             corr = [[round(rho(i, j), 3) for j in syms] for i in syms]
+            couple = [[(0.0 if i == j else round(W[i][j], 3)) for j in syms] for i in syms]
             await hub.broadcast({
                 "type": "uni", "ts": ts, "symbols": syms, "stocks": stocks,
                 "equity": strat.equity, "return_pct": tr["return_pct"], "sharpe": tr["sharpe"],
-                "training": training, "seen": seen, "warmup": args.warmup, "corr": corr})
+                "training": training, "seen": seen, "warmup": args.warmup,
+                "corr": corr, "couple": couple})
             await __import__("asyncio").sleep(frame_dt)
 
     print("Universe feed exhausted.")
