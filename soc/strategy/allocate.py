@@ -92,6 +92,7 @@ class UniverseStrategy:
     vol_floor: float = 5e-4                 # min vol for inverse-vol sizing
     conviction_full: float = 0.12           # mean|edge| at which we fully deploy
     target_pvol: float = 2e-3               # portfolio per-bar vol target (vol-targeting)
+    rev_hl: float = 50.0                    # cross-sectional reversal signal half-life (bars)
 
     def __post_init__(self):
         self.equity = self.initial_capital
@@ -103,6 +104,7 @@ class UniverseStrategy:
         self._sum = 0.0
         self._sumsq = 0.0
         self._pvol = self.target_pvol       # EWMA of |portfolio return| (for vol-targeting)
+        self._rev = {}                      # EWMA of each stock's return (reversal signal)
 
     def sharpe(self) -> float:
         if self._n < 30:
@@ -114,20 +116,18 @@ class UniverseStrategy:
         return (mean / (var ** 0.5)) * (self.ann_bars ** 0.5)
 
     def step(self, p: dict, price: dict, vol: dict) -> dict:
-        syms = list(p.keys())
-        edge = {s: 1.0 - 2.0 * p[s] for s in syms}
-        # dead-zone: ignore tiny edges (don't trade on noise near p=0.5)
-        for s in syms:
-            if abs(edge[s]) < self.edge_min:
-                edge[s] = 0.0
+        syms = list(price.keys())
+        # CROSS-SECTIONAL REVERSAL edge (the real gross alpha): long the relative loser, short
+        # the relative winner. Uses PRIOR returns (self._rev, updated at the END of the bar) so
+        # it is causal. The x_c direction signal (p) is unused here — it has no edge.
+        mr = sum(self._rev.get(s, 0.0) for s in syms) / max(1, len(syms))
+        edge = {s: -(self._rev.get(s, 0.0) - mr) for s in syms}
         # inverse-vol (risk-parity) raw weights: a volatile name gets a smaller position
         raw = {s: edge[s] / max(vol.get(s, self.vol_floor), self.vol_floor) for s in syms}
         gr = sum(abs(raw[s]) for s in syms)
         w = {s: (raw[s] / gr if gr > 1e-12 else 0.0) for s in syms}
-        # gross deployment: scale by average conviction AND by a portfolio vol target
-        conviction = sum(abs(edge[s]) for s in syms) / max(1, len(syms))
-        gross = min(1.0, conviction / self.conviction_full)
-        gross *= min(1.0, self.target_pvol / max(self._pvol, 1e-9))   # vol-targeting
+        # gross deployment: vol-target the portfolio
+        gross = min(1.0, self.target_pvol / max(self._pvol, 1e-9))
         target = {s: w[s] * gross * self.deployable for s in syms}
 
         # rebalance per stock past the band
@@ -142,16 +142,20 @@ class UniverseStrategy:
         self.equity -= cost
         self.total_cost += cost
 
-        # realize the move with the exposures now held
+        # realize the move; update the reversal EWMA with THIS bar's return (so it is causal
+        # for the next bar's edge)
+        a_rev = 1.0 - 0.5 ** (1.0 / self.rev_hl)
         pnl = 0.0
         for s in syms:
             pp = self.prev_px.get(s)
             if pp and pp > 0:
-                pnl += self.exposure[s] * (price[s] - pp) / pp
+                ret = (price[s] - pp) / pp
+                pnl += self.exposure[s] * ret
+                self._rev[s] = (1.0 - a_rev) * self._rev.get(s, 0.0) + a_rev * ret
             self.prev_px[s] = price[s]
         self.equity += pnl
 
-        r = pnl / self.initial_capital                  # per-bar return for Sharpe
+        r = (pnl - cost) / self.initial_capital         # NET per-bar return (after cost) for Sharpe
         self._n += 1; self._sum += r; self._sumsq += r * r
         self._pvol = 0.99 * self._pvol + 0.01 * abs(r)  # realized portfolio vol (vol-targeting)
 
