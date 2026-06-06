@@ -1,0 +1,31 @@
+.uni-main { padding: 10px 14px; flex: 1 1 auto; display: flex; flex-direction: column; gap: 10px; overflow: auto; }
+.uni-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(265px, 1fr)); gap: 10px; }
+.scard { background: var(--panel); border: 1px solid var(--grid); border-radius: 8px;
+  padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.sc-head { display: flex; justify-content: space-between; align-items: baseline; }
+.sc-sym { font-size: 15px; font-weight: bold; color: var(--accent); }
+.sc-ret { font-size: 13px; font-weight: bold; }
+.sc-spark { width: 100%; height: 78px; display: block; }
+.sc-row { display: flex; justify-content: space-between; font-size: 12px; }
+.sc-pos { font-weight: bold; }
+.pbar { position: relative; height: 16px; background: var(--panel2); border: 1px solid var(--grid); border-radius: 4px; overflow: hidden; }
+.pbar-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 50%; }
+.pbar-mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--muted); }
+.pbar-txt { position: absolute; width: 100%; text-align: center; font-size: 10px; line-height: 16px; color: var(--txt); z-index: 1; }
+.sc-meta { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); }
+.uni-bottom { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; height: 185px; flex: 0 0 auto; }
+.uni-bottom .panel { display: flex; flex-direction: column; }
+.uni-bottom canvas { flex: 1 1 auto; width: 100%; min-height: 0; }
+.heat { display: grid; gap: 3px; padding-top: 6px; }
+.heat .cell { display: flex; align-items: center; justify-content: center; font-size: 10px;
+  height: 30px; border-radius: 3px; color: #0d1117; font-weight: bold; }
+.heat .lab { color: var(--muted); font-weight: normal; }
+.phys { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-top: 4px; }
+.pcell { background: var(--panel2); border: 1px solid var(--grid); border-radius: 4px; padding: 3px 4px 1px; }
+.pcell .plab { font-size: 9px; color: var(--muted); text-align: center; margin-bottom: 1px; }
+.pcell canvas { width: 100%; height: 104px; display: block; }
+.mview { display: none; flex: 1 1 auto; min-height: 0; }
+.mview.active { display: flex; flex-direction: column; gap: 10px; overflow: auto; padding: 10px 14px; }
+.mspark { width: 100%; height: 120px; display: block; }
+.prow { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: var(--muted); }
+.prow b { color: var(--txt); }

@@ -14,9 +14,10 @@ from soc.model.hazard import HazardModel
 
 
 def _run():
-    market = SyntheticMarket(n_ticks=20_000, seed=11)
-    engine = Engine(HazardModel(alpha=1.0, beta=0.0, eta_theta=2e-3, eta_xc=5e-2),
-                    initial_gap=3.0)
+    # redesigned x_c is a SLOW, smooth estimator -> test it on a slowly-moving true x_c
+    market = SyntheticMarket(n_ticks=30_000, xc_period=30_000, seed=11)
+    engine = Engine(HazardModel(alpha=1.0, beta=0.0, eta_theta=2e-3),
+                    initial_gap=0.05)
     est, idx = [], []
     for i, tick in enumerate(market):
         ev = engine.step(tick)

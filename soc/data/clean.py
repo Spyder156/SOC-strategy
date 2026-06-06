@@ -17,7 +17,8 @@ import numpy as np
 import pandas as pd
 
 
-def clean_quotes(df: pd.DataFrame, mult: float = 5.0, min_abs: float = 0.05) -> pd.DataFrame:
+def clean_quotes(df: pd.DataFrame, mult: float = 5.0, min_abs: float = 0.05,
+                 level_tol: float = 0.005) -> pd.DataFrame:
     if "bid" not in df.columns or "ask" not in df.columns:
         # already a clean [ts, mid] frame
         out = df[["ts", "mid"]].copy()
@@ -35,6 +36,14 @@ def clean_quotes(df: pd.DataFrame, mult: float = 5.0, min_abs: float = 0.05) -> 
     out = pd.DataFrame({
         "ts": f["ts"].to_numpy(dtype=float),
         "mid": (f["bid"].to_numpy(dtype=float) + f["ask"].to_numpy(dtype=float)) / 2.0,
-    }).sort_values("ts")
+    }).sort_values("ts").reset_index(drop=True)
+
+    # level-sanity filter: drop mids that sit far from the local median. Catches STALE
+    # quotes at a wrong price level (tight spread, wrong price) that the spread filter
+    # misses — e.g. MSFT printing a stale $326 mid while trading at $372.
+    med = out["mid"].rolling(51, center=True, min_periods=10).median()
+    dev = ((out["mid"] - med).abs() / med).fillna(0.0)
+    out = out[dev < level_tol].reset_index(drop=True)
+
     out = out[out["mid"].ne(out["mid"].shift())].reset_index(drop=True)
     return out

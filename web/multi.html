@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SOC Universe — Live</title>
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="multi.css" />
+</head>
+<body>
+<header>
+  <h1><span class="soc">SOC</span> · Universe</h1>
+  <span class="feedtag" id="feedtag">minute bars</span>
+  <span class="conn"><span class="dot" id="conn"></span> <span id="connText">connecting…</span></span>
+  <span class="spacer"></span>
+  <div class="chips">
+    <div class="chip"><div class="k">Return</div><div class="v" id="cReturn">—</div></div>
+    <div class="chip"><div class="k">Sharpe</div><div class="v" id="cSharpe">—</div></div>
+    <div class="chip"><div class="k">Equity</div><div class="v" id="cEquity">—</div></div>
+    <div class="chip"><div class="k">Stocks</div><div class="v" id="cN">—</div></div>
+    <div class="chip"><div class="k">Bars</div><div class="v" id="cBars">—</div></div>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" data-tab="universe">Universe</div>
+  <div class="tab" data-tab="model">Model</div>
+</div>
+<div class="note" id="story">connecting…</div>
+
+<main>
+  <section class="mview active" id="universe">
+    <div id="cards" class="uni-grid"></div>
+    <div class="uni-bottom">
+      <div class="panel"><h2><span>Portfolio equity</span><span class="cur" id="curPort">—</span></h2><canvas id="chPort"></canvas></div>
+      <div class="panel"><h2>Cross-asset correlation (live EWMA)</h2><div class="heat" id="heat"></div></div>
+    </div>
+  </section>
+
+  <section class="mview" id="model">
+    <div class="note" style="padding:0 0 6px">Convergence variables per stock — should stabilise.
+      <span class="swatch" style="background:var(--accent)"></span>α
+      <span class="swatch" style="background:var(--green)"></span>β
+      <span class="swatch" style="background:var(--yellow)"></span>γ_v
+      <span class="swatch" style="background:var(--red)"></span>γ_a
+      <span class="swatch" style="background:var(--purple)"></span>μ(margin)</div>
+    <div id="mcards" class="uni-grid"></div>
+  </section>
+</main>
+
+<script src="multi.js"></script>
+</body>
+</html>

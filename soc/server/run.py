@@ -30,6 +30,7 @@ from ..model.engine import Engine
 from ..model.hazard import HazardModel
 from ..strategy.allocate import Strategy
 from .bus import Hub
+from .multi import producer_multi
 
 WEB = Path(__file__).resolve().parents[2] / "web"
 CTYPES = {".html": "text/html; charset=utf-8",
@@ -45,14 +46,13 @@ def build_feed(args):
 
 
 def build_pipeline(args):
-    engine = Engine(HazardModel(eta_theta=args.eta_theta, eta_xc=args.eta_xc),
-                    initial_gap=args.initial_gap)
+    engine = Engine(HazardModel(eta_theta=args.eta_theta), initial_gap=args.initial_gap)
     return engine, Strategy(initial_capital=args.capital), Metrics()
 
 
 def view_frame(ev: dict, tr: dict) -> dict:
     return {"type": "view", "ts": ev["ts"], "symbol": ev["symbol"], "x": ev["x"],
-            "x_c": ev["x_c"], "gap": ev["gap"], "p": ev["p"], "y": ev["y"],
+            "x_c": ev["x_c"], "x_bar": ev["x_bar"], "gap": ev["gap"], "p": ev["p"], "y": ev["y"],
             "params": ev["params"], "equity": tr["equity"], "exposure": tr["exposure"],
             "return_pct": tr["return_pct"], "traded": tr["traded"]}
 
@@ -64,9 +64,16 @@ async def producer(hub, args):
                          "capital": args.capital})
     frame_dt = 1.0 / args.fps if args.fps and args.fps > 0 else 0.0
     since = 0
+    seen = 0
     for tick in feed:
         ev = engine.step(tick)
         if ev is None:
+            continue
+        seen += 1
+        if seen <= args.warmup:                  # WARM-UP: train x_c/params silently, no trades/metrics
+            if seen % max(1, args.warmup // 50) == 0:
+                await hub.broadcast({"type": "status", "phase": "warmup", "seen": seen, "total": args.warmup})
+                await asyncio.sleep(0)
             continue
         tr = strat.on_event(ev)
         metrics.update(ev["p"], ev["y"])
@@ -86,6 +93,9 @@ async def producer(hub, args):
 
 # --------------------------------------------------------------------------- server
 async def serve_http_ws(args):
+    multi = bool(args.symbols and "," in args.symbols)
+    index_file = "multi.html" if multi else "index.html"
+    prod = producer_multi if multi else producer
     hub = Hub()
 
     async def process_request(connection, request):
@@ -94,7 +104,7 @@ async def serve_http_ws(args):
         if path == "/stream":
             return None                          # None => continue with websocket handshake
         if path in ("/", ""):
-            path = "/index.html"
+            path = "/" + index_file
         f = (WEB / path.lstrip("/")).resolve()
         if not str(f).startswith(str(WEB)) or not f.is_file():
             return connection.respond(404, "not found")
@@ -118,9 +128,10 @@ async def serve_http_ws(args):
             hub.unregister(conn)
 
     async with serve(ws_handler, "localhost", args.port, process_request=process_request):
-        print(f"SOC dashboard:  http://localhost:{args.port}   (feed={args.feed} symbol={args.symbol})")
+        tag = f"universe={args.symbols}" if multi else f"feed={args.feed} symbol={args.symbol}"
+        print(f"SOC dashboard:  http://localhost:{args.port}   ({tag})")
         print("Ctrl-C to stop.")
-        await producer(hub, args)
+        await prod(hub, args)
         await asyncio.Future()                   # keep serving after the feed ends
 
 
@@ -139,13 +150,15 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--feed", choices=["synthetic", "replay"], default="synthetic")
     ap.add_argument("--symbol", default="SYN")
+    ap.add_argument("--symbols", default="", help="comma list -> multi-stock universe view, e.g. AAPL,MSFT,NVDA")
     ap.add_argument("--port", type=int, default=8080)
     ap.add_argument("--stride", type=int, default=20)
     ap.add_argument("--fps", type=float, default=30.0)
     ap.add_argument("--headless", action="store_true")
     ap.add_argument("--eta-theta", type=float, default=1e-3)
-    ap.add_argument("--eta-xc", type=float, default=5e-2)
-    ap.add_argument("--initial-gap", type=float, default=1.0)
+    ap.add_argument("--initial-gap", type=float, default=0.08, help="initial LOG gap (0.08 = 8%)")
+    ap.add_argument("--warmup", type=int, default=5000, help="train this many ticks/bars before deploying capital")
+    ap.add_argument("--couple", type=float, default=1.0, help="cross-asset coupling strength: correlated peer returns nudge x_c. 0=off")
     ap.add_argument("--capital", type=float, default=100_000.0)
     ap.add_argument("--n-ticks", type=int, default=200_000)
     ap.add_argument("--seed", type=int, default=7)

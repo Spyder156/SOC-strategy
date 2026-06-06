@@ -17,12 +17,15 @@ class Hub:
         self.clients: Set = set()
         self.recent = deque(maxlen=backlog)   # recent view frames for late joiners
         self.last_metric: Optional[dict] = None
+        self.last_status: Optional[dict] = None
         self.config: Optional[dict] = None
 
     async def register(self, ws) -> None:
         self.clients.add(ws)
         if self.config:
             await ws.send(json.dumps(self.config))
+        if self.last_status:
+            await ws.send(json.dumps(self.last_status))
         for frame in list(self.recent):
             await ws.send(json.dumps(frame))
         if self.last_metric:
@@ -32,10 +35,12 @@ class Hub:
         self.clients.discard(ws)
 
     async def broadcast(self, msg: dict) -> None:
-        if msg.get("type") == "view":
+        if msg.get("type") in ("view", "uni"):
             self.recent.append(msg)
         elif msg.get("type") == "metric":
             self.last_metric = msg
+        elif msg.get("type") == "status":
+            self.last_status = msg
         elif msg.get("type") == "config":
             self.config = msg
 

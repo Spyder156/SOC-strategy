@@ -70,7 +70,8 @@ def fetch_quotes(symbol: str, start: str, end: str, feed: str = "iex",
         sys.exit("No quotes returned — check symbol, date range, and market hours.")
 
     df = pd.DataFrame(rows, columns=["t", "bid", "ask"])
-    df["ts"] = pd.to_datetime(df["t"], format="ISO8601", utc=True).astype("int64") / 1e9
+    _dt = pd.to_datetime(df["t"], format="ISO8601", utc=True)
+    df["ts"] = (_dt - pd.Timestamp("1970-01-01", tz="UTC")).dt.total_seconds()
     df["mid"] = (df["bid"] + df["ask"]) / 2.0
     df = df[["ts", "bid", "ask", "mid"]].sort_values("ts").reset_index(drop=True)
     # drop consecutive unchanged mids — only mid *moves* are ticks

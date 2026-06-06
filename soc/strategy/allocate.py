@@ -70,3 +70,85 @@ class Strategy:
             "total_cost": self.total_cost,
             "return_pct": 100.0 * (self.equity - self.initial_capital) / self.initial_capital,
         }
+
+
+@dataclass
+class UniverseStrategy:
+    """Universe-level allocation: split the WHOLE budget across the universe by relative edge.
+
+    Each tick:  edge_i = 1 - 2*p_i  (p_i = P(avalanche)).  We put capital where conviction is
+    highest *across the universe*: w_i = edge_i / sum_j|edge_j|, so |weights| sum to the
+    deployable budget. Long where p<0.5, short where p>0.5, sized by relative conviction.
+    A no-trade band stops churn; P&L is one shared portfolio.
+    """
+
+    initial_capital: float = 100_000.0
+    leverage: float = 1.0
+    band: float = 0.03                      # rebalance threshold, fraction of deployable
+    cost_rate: float = 5e-5
+
+    ann_bars: float = 98280.0               # ~252 trading days * 390 min, for annualised Sharpe
+
+    def __post_init__(self):
+        self.equity = self.initial_capital
+        self.deployable = self.initial_capital * self.leverage
+        self.exposure = {}                  # signed $ per symbol
+        self.prev_px = {}
+        self.total_cost = 0.0
+        self._n = 0                         # per-bar return stats for Sharpe
+        self._sum = 0.0
+        self._sumsq = 0.0
+
+    def sharpe(self) -> float:
+        if self._n < 30:
+            return 0.0
+        mean = self._sum / self._n
+        var = self._sumsq / self._n - mean * mean
+        if var <= 1e-18:
+            return 0.0
+        return (mean / (var ** 0.5)) * (self.ann_bars ** 0.5)
+
+    def step(self, p: dict, price: dict) -> dict:
+        syms = list(p.keys())
+        edge = {s: 1.0 - 2.0 * p[s] for s in syms}
+        gross = sum(abs(edge[s]) for s in syms)
+        target = {s: (edge[s] / gross) * self.deployable if gross > 1e-9 else 0.0 for s in syms}
+
+        # rebalance per stock past the band
+        cost = 0.0
+        for s in syms:
+            cur = self.exposure.get(s, 0.0)
+            if abs(target[s] - cur) > self.band * self.deployable:
+                cost += self.cost_rate * abs(target[s] - cur)
+                self.exposure[s] = target[s]
+            else:
+                self.exposure.setdefault(s, cur)
+        self.equity -= cost
+        self.total_cost += cost
+
+        # realize the move with the exposures now held
+        pnl = 0.0
+        for s in syms:
+            pp = self.prev_px.get(s)
+            if pp and pp > 0:
+                pnl += self.exposure[s] * (price[s] - pp) / pp
+            self.prev_px[s] = price[s]
+        self.equity += pnl
+
+        r = pnl / self.initial_capital                  # per-bar return for Sharpe
+        self._n += 1; self._sum += r; self._sumsq += r * r
+
+        return {
+            "equity": self.equity,
+            "return_pct": 100.0 * (self.equity - self.initial_capital) / self.initial_capital,
+            "sharpe": self.sharpe(),
+            "pnl_step": pnl, "cost": cost, "total_cost": self.total_cost,
+            "exposure": dict(self.exposure),
+            "weight": {s: (self.exposure[s] / self.deployable) for s in syms},  # fraction of budget
+            "edge": edge,
+        }
+
+    def carry(self, price: dict):
+        """Carry prices across a gap without realising P&L (overnight reprice)."""
+        for s, px in price.items():
+            self.prev_px[s] = px

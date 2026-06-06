@@ -5,7 +5,7 @@ const C = { price:"#e6edf3", xc:"#f0883e", accent:"#58a6ff", green:"#3fb950",
 const MAXPTS = 1800;
 const PAD = { l: 46, r: 58, t: 8, b: 18 };
 
-const buf = { ts:[], price:[], xc:[], p:[], equity:[], exposure:[], gap:[], y:[],
+const buf = { ts:[], price:[], xc:[], xbar:[], p:[], equity:[], exposure:[], gap:[], y:[],
               alpha:[], beta:[], gv:[], ga:[], rollLoss:[], rollBrier:[], rollWin:[] };
 let calib = [], lastMetric = null, lastView = null;
 let paused = false, hoverFrac = null, hoverCanvas = null, activeTab = "market";
@@ -47,10 +47,18 @@ function handle(m) {
     $("symbol").textContent = m.symbol; $("feedtag").textContent = `feed: ${m.feed}`;
     return;
   }
+  if (m.type === "status") {
+    if (m.phase === "warmup") {
+      $("story").textContent = `Warming up — training the model… ${m.seen.toLocaleString()} / ${m.total.toLocaleString()} bars`;
+      const t = $("connText"); t.textContent = "warming up"; t.style.color = "var(--yellow)";
+    }
+    return;
+  }
   if (paused) return;
   if (m.type === "view") {
     lastView = m;
-    push(buf.ts, m.ts); push(buf.price, m.x); push(buf.xc, m.x_c); push(buf.p, m.p);
+    const ct = $("connText"); if (ct.textContent !== "live") { ct.textContent = "live"; ct.style.color = "var(--green)"; }
+    push(buf.ts, m.ts); push(buf.price, m.x); push(buf.xc, m.x_c); push(buf.xbar, m.x_bar); push(buf.p, m.p);
     push(buf.equity, m.equity); push(buf.exposure, m.exposure); push(buf.gap, m.gap); push(buf.y, m.y);
     push(buf.alpha, m.params.alpha); push(buf.beta, m.params.beta);
     push(buf.gv, m.params.gamma_v); push(buf.ga, m.params.gamma_a);
@@ -111,7 +119,7 @@ function updateModel(m) {
 // ---- chart specs (single source of truth for draw + tooltip) -----------------
 function specFor(id) {
   switch (id) {
-    case "chPrice": return { series:[{label:"price",color:C.price,data:buf.price},{label:"x_c",color:C.xc,data:buf.xc}], fill:[0,1,"#f0883e22"], dec:2 };
+    case "chPrice": return { series:[{label:"price",color:C.price,data:buf.price},{label:"x_c",color:C.xc,data:buf.xc},{label:"x̄ base",color:C.muted,data:buf.xbar}], fill:[0,1,"#f0883e22"], dec:2 };
     case "chProb": return { series:[{label:"P(down)",color:C.accent,data:buf.p}], fixed:[0,1], ref:0.5, dec:2 };
     case "chEquity": return { series:[{label:"equity",color:C.green,data:buf.equity}], money:true, dec:0 };
     case "chExposure": return { series:[{label:"exposure",color:C.yellow,data:buf.exposure}], ref:0, money:true, dec:0 };
