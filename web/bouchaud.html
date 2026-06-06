@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SOC Fragility — Bouchaud</title>
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="multi.css" />
+</head>
+<body>
+<header>
+  <h1><span class="soc">SOC</span> · Fragility <span class="feedtag">branching ratio, not direction</span></h1>
+  <span class="conn"><span class="dot" id="conn"></span> <span id="connText">connecting…</span></span>
+  <span class="spacer"></span>
+  <div class="chips">
+    <div class="chip"><div class="k">Strategy Sharpe</div><div class="v" id="cSharpe">—</div></div>
+    <div class="chip"><div class="k">Buy-hold Sharpe</div><div class="v" id="cBh">—</div></div>
+    <div class="chip"><div class="k">Exposure</div><div class="v" id="cExp">—</div></div>
+    <div class="chip"><div class="k">Avalanches</div><div class="v" id="cAv">—</div></div>
+  </div>
+</header>
+<div class="note" id="story">Avalanche = a large move (|r| &gt; k·σ). They cluster (self-exciting), so P(big move) is forecastable. We cut exposure when fragility is high → lower variance → higher Sharpe.</div>
+
+<main class="uni-main">
+  <div id="cards" class="uni-grid"></div>
+  <div class="uni-bottom" style="height:210px">
+    <div class="panel"><h2><span>Equity: <span style="color:var(--green)">fragility strategy</span> vs <span style="color:var(--muted)">buy &amp; hold</span></span><span class="cur" id="curEq">—</span></h2><canvas id="chEq"></canvas></div>
+    <div class="panel"><h2><span>Avalanche-size distribution (log-log → power law)</span></h2><canvas id="chPow"></canvas></div>
+  </div>
+</main>
+<script src="bouchaud.js"></script>
+</body>
+</html>

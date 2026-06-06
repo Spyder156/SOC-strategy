@@ -35,7 +35,7 @@ class Hub:
         self.clients.discard(ws)
 
     async def broadcast(self, msg: dict) -> None:
-        if msg.get("type") in ("view", "uni"):
+        if msg.get("type") in ("view", "uni", "frag"):
             self.recent.append(msg)
         elif msg.get("type") == "metric":
             self.last_metric = msg

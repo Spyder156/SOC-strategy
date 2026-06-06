@@ -31,6 +31,7 @@ from ..model.hazard import HazardModel
 from ..strategy.allocate import Strategy
 from .bus import Hub
 from .multi import producer_multi
+from .fragility import producer_fragility
 
 WEB = Path(__file__).resolve().parents[2] / "web"
 CTYPES = {".html": "text/html; charset=utf-8",
@@ -93,9 +94,10 @@ async def producer(hub, args):
 
 # --------------------------------------------------------------------------- server
 async def serve_http_ws(args):
-    multi = bool(args.symbols and "," in args.symbols)
-    index_file = "multi.html" if multi else "index.html"
-    prod = producer_multi if multi else producer
+    frag = bool(getattr(args, "fragility", False) and args.symbols)
+    multi = bool(args.symbols and "," in args.symbols) and not frag
+    index_file = "bouchaud.html" if frag else ("multi.html" if multi else "index.html")
+    prod = producer_fragility if frag else (producer_multi if multi else producer)
     hub = Hub()
 
     async def process_request(connection, request):
@@ -151,6 +153,7 @@ def main():
     ap.add_argument("--feed", choices=["synthetic", "replay"], default="synthetic")
     ap.add_argument("--symbol", default="SYN")
     ap.add_argument("--symbols", default="", help="comma list -> multi-stock universe view, e.g. AAPL,MSFT,NVDA")
+    ap.add_argument("--fragility", action="store_true", help="Bouchaud fragility dashboard (vol/branching-ratio, not direction)")
     ap.add_argument("--port", type=int, default=8080)
     ap.add_argument("--stride", type=int, default=20)
     ap.add_argument("--fps", type=float, default=30.0)
