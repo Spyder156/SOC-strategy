@@ -1,9 +1,9 @@
 """Bouchaud-style fragility model.
 
 The order parameter is NOT a price ceiling — it's the system's SELF-EXCITATION (the Hawkes
-branching ratio). An "avalanche" is a LARGE move (|r| > k*sigma), in either direction. Large
-moves cluster in time (self-exciting), so the *probability of a large move* is forecastable
-even though its *sign* is not. We:
+branching ratio). An "avalanche" is a large DOWNWARD move (r < -k*sigma) — a drawdown, like a
+real sandpile sliding down. Drawdowns cluster in time (self-exciting), so the *probability of a
+drawdown* is forecastable. We:
 
   - track realized vol sigma (so the avalanche threshold is scale-free),
   - maintain a self-exciting intensity S (Hawkes EWMA of recent avalanches),
@@ -38,12 +38,12 @@ class FragilityModel:
     base_hl: float = 3000.0      # background avalanche-rate timescale
     eta: float = 5e-3            # hazard learning rate
 
-    w0: float = -2.5             # learned hazard bias
+    w0: float = -3.2             # learned hazard bias
     wS: float = 3.0              # learned self-excitation weight
 
     sigma: float = 1e-3
-    S: float = 0.06              # self-exciting intensity (recent avalanche rate)
-    base_rate: float = 0.06      # background avalanche rate
+    S: float = 0.03              # self-exciting intensity (recent drawdown rate)
+    base_rate: float = 0.03      # background drawdown rate
     prev_price: float = float("nan")
     n_ticks: int = 0
     sizes: List[float] = field(default_factory=list)
@@ -58,7 +58,7 @@ class FragilityModel:
         a_v = _a(self.vol_hl)
         self.sigma = (1.0 - a_v) * self.sigma + a_v * abs(r)
         z_size = abs(r) / max(self.sigma, 1e-12)
-        is_av = 1 if z_size > self.k_aval else 0
+        is_av = 1 if (z_size > self.k_aval and r < 0) else 0   # avalanche = large DOWNWARD move
 
         # predict P(large move this bar) from PRIOR self-excitation (before this event)
         excess = self.S - self.base_rate
