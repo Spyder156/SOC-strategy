@@ -136,7 +136,8 @@ async def producer_multi(hub, args):
                   "return_pct": 100 * (strat.equity - strat.initial_capital) / strat.initial_capital,
                   "sharpe": strat.sharpe()}
         else:
-            tr = strat.step({s: evs[s]["p"] for s in syms}, prices)
+            tr = strat.step({s: evs[s]["p"] for s in syms}, prices,
+                            {s: eng[s].state.vol for s in syms})
             for s in syms:
                 met[s].update(evs[s]["p"], evs[s]["y"])
 

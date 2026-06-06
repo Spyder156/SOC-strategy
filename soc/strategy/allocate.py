@@ -84,10 +84,14 @@ class UniverseStrategy:
 
     initial_capital: float = 100_000.0
     leverage: float = 1.0
-    band: float = 0.03                      # rebalance threshold, fraction of deployable
+    band: float = 0.08                      # wider no-trade band -> less turnover/cost
     cost_rate: float = 5e-5
-
     ann_bars: float = 98280.0               # ~252 trading days * 390 min, for annualised Sharpe
+    # --- Sharpe-optimising knobs (optimize_sharpe branch) ---
+    edge_min: float = 0.02                  # dead-zone: ignore |edge| below this (don't trade noise)
+    vol_floor: float = 5e-4                 # min vol for inverse-vol sizing
+    conviction_full: float = 0.12           # mean|edge| at which we fully deploy
+    target_pvol: float = 2e-3               # portfolio per-bar vol target (vol-targeting)
 
     def __post_init__(self):
         self.equity = self.initial_capital
@@ -98,6 +102,7 @@ class UniverseStrategy:
         self._n = 0                         # per-bar return stats for Sharpe
         self._sum = 0.0
         self._sumsq = 0.0
+        self._pvol = self.target_pvol       # EWMA of |portfolio return| (for vol-targeting)
 
     def sharpe(self) -> float:
         if self._n < 30:
@@ -108,11 +113,22 @@ class UniverseStrategy:
             return 0.0
         return (mean / (var ** 0.5)) * (self.ann_bars ** 0.5)
 
-    def step(self, p: dict, price: dict) -> dict:
+    def step(self, p: dict, price: dict, vol: dict) -> dict:
         syms = list(p.keys())
         edge = {s: 1.0 - 2.0 * p[s] for s in syms}
-        gross = sum(abs(edge[s]) for s in syms)
-        target = {s: (edge[s] / gross) * self.deployable if gross > 1e-9 else 0.0 for s in syms}
+        # dead-zone: ignore tiny edges (don't trade on noise near p=0.5)
+        for s in syms:
+            if abs(edge[s]) < self.edge_min:
+                edge[s] = 0.0
+        # inverse-vol (risk-parity) raw weights: a volatile name gets a smaller position
+        raw = {s: edge[s] / max(vol.get(s, self.vol_floor), self.vol_floor) for s in syms}
+        gr = sum(abs(raw[s]) for s in syms)
+        w = {s: (raw[s] / gr if gr > 1e-12 else 0.0) for s in syms}
+        # gross deployment: scale by average conviction AND by a portfolio vol target
+        conviction = sum(abs(edge[s]) for s in syms) / max(1, len(syms))
+        gross = min(1.0, conviction / self.conviction_full)
+        gross *= min(1.0, self.target_pvol / max(self._pvol, 1e-9))   # vol-targeting
+        target = {s: w[s] * gross * self.deployable for s in syms}
 
         # rebalance per stock past the band
         cost = 0.0
@@ -137,6 +153,7 @@ class UniverseStrategy:
 
         r = pnl / self.initial_capital                  # per-bar return for Sharpe
         self._n += 1; self._sum += r; self._sumsq += r * r
+        self._pvol = 0.99 * self._pvol + 0.01 * abs(r)  # realized portfolio vol (vol-targeting)
 
         return {
             "equity": self.equity,
